@@ -89,34 +89,52 @@ def generate_2fa(username):
 
 #------------------------------------------------------------------------------------------------
 
+def get_db_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="flask_api_db"
+    )
+
 @app.route('/products', methods=['POST'])
 @jwt_required()
-def create_product():
+def add_product():
+    current_user = get_jwt_identity()
     data = request.json
-    cursor.execute("INSERT INTO products (name, description, price, quantity) VALUES (%s, %s, %s, %s)",
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO products (pname, description, price, stock) VALUES (%s, %s, %s, %s)", 
                    (data['pname'], data.get('description', ''), data['price'], data['stock']))
-    db.commit()
-    return jsonify({'message': 'Product added'}), 201
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Product added successfully'})
 
 #------------------------------------------------------------------------------------------------
 
 @app.route('/products', methods=['GET'])
 @jwt_required()
 def get_products():
+    conn = get_db_connection()
+    cursor = conn.cursor()
     cursor.execute("SELECT * FROM products")
     products = cursor.fetchall()
-    return jsonify(products)
+    conn.close()
+    return jsonify({'products': products})
 
 #------------------------------------------------------------------------------------------------
 
 @app.route('/products/<int:pid>', methods=['GET'])
 @jwt_required()
 def get_product(pid):
-    cursor.execute("SELECT * FROM products WHERE id=%s", (pid,))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM products WHERE pid=%s", (pid,))
     product = cursor.fetchone()
-    if not product:
-        return jsonify({'error': 'Product not found'}), 404
-    return jsonify(product)
+    conn.close()
+    if product:
+        return jsonify({'product': product})
+    return jsonify({'message': 'Product not found'}), 404
 
 #------------------------------------------------------------------------------------------------
 
@@ -124,9 +142,12 @@ def get_product(pid):
 @jwt_required()
 def update_product(pid):
     data = request.json
-    cursor.execute("UPDATE products SET name=%s, description=%s, price=%s, quantity=%s WHERE id=%s",
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE products SET pname=%s, description=%s, price=%s, stock=%s WHERE pid=%s", 
                    (data['pname'], data.get('description', ''), data['price'], data['stock'], pid))
-    db.commit()
+    conn.commit()
+    conn.close()
     return jsonify({'message': 'Product updated successfully'})
 
 #------------------------------------------------------------------------------------------------
@@ -134,10 +155,12 @@ def update_product(pid):
 @app.route('/products/<int:pid>', methods=['DELETE'])
 @jwt_required()
 def delete_product(pid):
-    cursor.execute("DELETE FROM products WHERE id=%s", (pid,))
-    db.commit()
-    return jsonify({'message': 'Product deleted'})
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM products WHERE pid=%s", (pid,))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Product deleted successfully'})
 
 if __name__ == '__main__':
     app.run(debug=True)
